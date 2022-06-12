@@ -211,7 +211,7 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn create_icmpv4_packet<'a>(icmp_header: &'a mut [u8], seq: u8) -> MutableEchoRequestPacket<'a> {
+fn create_icmpv4_packet(icmp_header: &mut [u8], seq: u8) -> MutableEchoRequestPacket {
     let mut icmp_packet = MutableEchoRequestPacket::new(icmp_header).unwrap();
     icmp_packet.set_icmp_type(IcmpTypes::EchoRequest);
     icmp_packet.set_icmp_code(IcmpCodes::NoCode);
@@ -223,10 +223,10 @@ fn create_icmpv4_packet<'a>(icmp_header: &'a mut [u8], seq: u8) -> MutableEchoRe
     icmp_packet
 }
 
-fn create_icmpv6_packet<'a>(
-    icmp_header: &'a mut [u8],
+fn create_icmpv6_packet(
+    icmp_header: &mut [u8],
     seq: u8,
-) -> pnet::packet::icmpv6::echo_request::MutableEchoRequestPacket<'a> {
+) -> pnet::packet::icmpv6::echo_request::MutableEchoRequestPacket {
     let mut icmp_packet =
         pnet::packet::icmpv6::echo_request::MutableEchoRequestPacket::new(icmp_header).unwrap();
     icmp_packet.set_icmpv6_type(EchoRequest);
