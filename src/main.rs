@@ -1,43 +1,80 @@
-use anyhow::Ok;
+extern crate core;
+
+use std::{
+    env,
+    net::IpAddr,
+    sync::{Arc, RwLock},
+    time::Instant,
+};
+
+use anyhow::{Ok, Result};
 use pnet::packet::{
     icmp::{
-        destination_unreachable::DestinationUnreachable,
         echo_reply::EchoReplyPacket,
         echo_request::{IcmpCodes, MutableEchoRequestPacket},
         time_exceeded::TimeExceededPacket,
-        IcmpPacket,
-        IcmpTypes::{self, TimestampReply},
+        IcmpTypes,
     },
+    icmpv6::{echo_request::Icmpv6Codes::NoCode, Icmpv6Types::EchoRequest},
     ip::IpNextHeaderProtocols,
-    util, Packet, PacketData,
+    util, Packet,
 };
 use pnet_transport::icmp_packet_iter;
 use pnet_transport::TransportChannelType::Layer4;
 use pnet_transport::{transport_channel, TransportProtocol};
 use rand::random;
-use std::{
-    env,
-    net::IpAddr,
-    process::id,
-    sync::{Arc, RwLock},
-    time::{Duration, Instant},
-};
 
 const ICMP_SIZE: usize = 10;
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<()> {
     let args: Vec<String> = env::args().collect();
     if args.len() < 2 {
-        panic!("Usage: icmp-demo target_ip");
+        panic!("Usage: icmp target_ip");
     }
-    let target_ip: IpAddr = args[1].parse().unwrap();
-    println!("icmp echo request to target ip:{:#?}", target_ip);
 
-    let protocol = Layer4(TransportProtocol::Ipv4(IpNextHeaderProtocols::Icmp));
+    // resolve domain args[1]
+    let hosts = dns_lookup::lookup_host(args[1].as_str()).unwrap();
+    if hosts.is_empty() {
+        panic!("dns query failed")
+    }
+    let target_ip = *hosts.first().unwrap();
+
+    let is_ipv4 = target_ip.is_ipv4();
+    println!(
+        "icmp request(ipv4{:?}) to target ip:{:#?}",
+        is_ipv4, target_ip
+    );
+
+    let protocol = match target_ip.is_ipv4() {
+        true => Layer4(TransportProtocol::Ipv4(IpNextHeaderProtocols::Icmp)),
+        false => Layer4(TransportProtocol::Ipv6(IpNextHeaderProtocols::Icmpv6)),
+    };
     let (mut tx, mut rx) = match transport_channel(4096, protocol) {
-        std::result::Result::Ok((tx, rx)) => (tx, rx),
+        Result::Ok((tx, rx)) => (tx, rx),
         Err(e) => return Err(e.into()),
     };
+
+    std::thread::spawn(move || {
+        // create a new thread
+        let mut ttl = 0;
+        while ttl < 30 {
+            ttl += 1;
+            let mut icmp_header: [u8; ICMP_SIZE] = [0; ICMP_SIZE];
+            tx.set_ttl(ttl);
+            if is_ipv4 {
+                let icmp_packet = create_icmpv4_packet(&mut icmp_header, ttl);
+                // println!("icmp_packet:{:?}", icmp_packet);
+                tx.send_to(icmp_packet, target_ip)
+                    .expect("send packet error");
+            } else {
+                let icmp_packet = create_icmpv6_packet(&mut icmp_header, ttl);
+                // println!("icmp_packet:{:?}", icmp_packet);
+                tx.send_to(icmp_packet, target_ip)
+                    .expect("send packet error");
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1))
+        }
+    });
 
     std::thread::spawn(move || {
         let mut iter = icmp_packet_iter(&mut rx);
@@ -53,13 +90,14 @@ fn main() -> anyhow::Result<()> {
                             let identifier = reply.get_identifier();
                             let sequence_number = reply.get_sequence_number();
                             println!(
-                            "ICMP EchoReply received from {:?}: {:?} , Time:{:?}; identify: {}, seq: {}",
-                            addr,
-                            packet.get_icmp_type(),
-                            rtt,
-                            identifier,
-                            sequence_number
-                        );
+                                "ICMP EchoReply received from {:?}: {:?} , Time:{:?}; identify: {}, seq: {}",
+                                addr,
+                                packet.get_icmp_type(),
+                                rtt,
+                                identifier,
+                                sequence_number
+                            );
+                            break;
                         }
                         IcmpTypes::TimeExceeded => {
                             let reply = TimeExceededPacket::new(packet.packet()).unwrap();
@@ -76,6 +114,12 @@ fn main() -> anyhow::Result<()> {
                                 addr, rtt
                             );
                         }
+                        IcmpTypes::Timestamp => {
+                            println!(
+                                "ICMP Timestamp received from {:?}, Time:{:?}",
+                                addr, rtt
+                            );
+                        }
                         _ => {
                             println!("get package {:?}, {:?}", packet.get_icmp_type(), addr);
                             // println!("get icmp reply: {:?}", t)
@@ -88,28 +132,32 @@ fn main() -> anyhow::Result<()> {
                 }
             }
 
-            std::thread::sleep(Duration::from_millis(500));
+            std::thread::sleep(std::time::Duration::from_millis(500));
         }
-    });
-
-    // create a new thread
-    let mut ttl = 0;
-    while ttl < 30 {
-        ttl += 1;
-        let mut icmp_header: [u8; ICMP_SIZE] = [0; ICMP_SIZE];
-        let icmp_packet = create_icmp_packet(&mut icmp_header, ttl);
-        // println!("icmp_packet:{:?}", icmp_packet);
-        tx.set_ttl(ttl);
-        tx.send_to(icmp_packet, target_ip);
-        std::thread::sleep(std::time::Duration::from_secs(1))
-    }
+    }).join().unwrap();
     Ok(())
 }
 
-fn create_icmp_packet<'a>(icmp_header: &'a mut [u8], seq: u8) -> MutableEchoRequestPacket<'a> {
+fn create_icmpv4_packet<'a>(icmp_header: &'a mut [u8], seq: u8) -> MutableEchoRequestPacket<'a> {
     let mut icmp_packet = MutableEchoRequestPacket::new(icmp_header).unwrap();
     icmp_packet.set_icmp_type(IcmpTypes::EchoRequest);
     icmp_packet.set_icmp_code(IcmpCodes::NoCode);
+    icmp_packet.set_identifier(random::<u16>());
+    icmp_packet.set_sequence_number(seq as u16);
+    let checksum = util::checksum(icmp_packet.packet(), 1);
+    icmp_packet.set_checksum(checksum);
+
+    icmp_packet
+}
+
+fn create_icmpv6_packet<'a>(
+    icmp_header: &'a mut [u8],
+    seq: u8,
+) -> pnet::packet::icmpv6::echo_request::MutableEchoRequestPacket<'a> {
+    let mut icmp_packet =
+        pnet::packet::icmpv6::echo_request::MutableEchoRequestPacket::new(icmp_header).unwrap();
+    icmp_packet.set_icmpv6_type(EchoRequest);
+    icmp_packet.set_icmpv6_code(NoCode);
     icmp_packet.set_identifier(random::<u16>());
     icmp_packet.set_sequence_number(seq as u16);
     let checksum = util::checksum(icmp_packet.packet(), 1);
