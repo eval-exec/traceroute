@@ -8,6 +8,7 @@ use std::{
 };
 
 use anyhow::{Ok, Result};
+use pnet::packet::icmpv6::Icmpv6Types;
 use pnet::packet::{
     icmp::{
         echo_reply::EchoReplyPacket,
@@ -77,138 +78,135 @@ fn main() -> Result<()> {
     });
 
     std::thread::spawn(move || {
-        if is_ipv4{
-
-        let mut iter = icmp_packet_iter(&mut rx);
-        loop {
-            let timer = Arc::new(RwLock::new(Instant::now()));
-            match iter.next() {
-                std::result::Result::Ok((packet, addr)) => {
-                    let start_time = timer.read().unwrap();
-                    let rtt = Instant::now().duration_since(*start_time);
-                    match packet.get_icmp_type() {
-                        IcmpTypes::EchoReply => {
-                            let reply = EchoReplyPacket::new(packet.packet()).unwrap();
-                            let identifier = reply.get_identifier();
-                            let sequence_number = reply.get_sequence_number();
-                            println!(
-                                "ICMP EchoReply received from {:?}: {:?} , Time:{:?}; identify: {}, seq: {}",
-                                addr,
-                                packet.get_icmp_type(),
-                                rtt,
-                                identifier,
-                                sequence_number
-                            );
-                            break;
-                        }
-                        IcmpTypes::TimeExceeded => {
-                            let reply = TimeExceededPacket::new(packet.packet()).unwrap();
-                            println!(
-                                "ICMP TimeExceeded received from {:?}: {:?} , Time:{:?}",
-                                addr,
-                                packet.get_icmp_type(),
-                                rtt,
-                            );
-                        }
-                        IcmpTypes::DestinationUnreachable => {
-                            println!(
-                                "ICMP DestinationUnreachable received from {:?}, Time:{:?}",
-                                addr, rtt
-                            );
-                        }
-                        IcmpTypes::Timestamp => {
-                            println!(
-                                "ICMP Timestamp received from {:?}, Time:{:?}",
-                                addr, rtt
-                            );
-                        }
-                        _ => {
-                            println!("get package {:?}, {:?}", packet.get_icmp_type(), addr);
-                            // println!("get icmp reply: {:?}", t)
-                        }
-                    }
-                }
-                Err(e) => {
-                    println!("An error occurred while reading: {}", e);
-                    break;
-                }
-            }
-
-            std::thread::sleep(std::time::Duration::from_millis(500));
-        }
-    }else{
-
-        let mut iter = pnet_transport::icmpv6_packet_iter(&mut rx);
-        loop {
-            let timer = Arc::new(RwLock::new(Instant::now()));
-            match iter.next() {
-                std::result::Result::Ok((packet, addr)) => {
-                    let start_time = timer.read().unwrap();
-                    let rtt = Instant::now().duration_since(*start_time);
-                    match packet.get_icmpv6_type() {
-                        pnet::packet::icmpv6::Icmpv6Types::EchoReply => {
-                            let reply = pnet::packet::icmpv6::echo_reply::EchoReplyPacket::new(packet.packet()).unwrap();
-                            let identifier = reply.get_identifier();
-                            let sequence_number = reply.get_sequence_number();
-                            println!(
-                                "ICMPv6 EchoReply received from {:?}: {:?} , Time:{:?}; identify: {}, seq: {}",
-                                addr,
-                                packet.get_icmpv6_type(),
-                                rtt,
-                                identifier,
-                                sequence_number
-                            );
-                            break;
-                        }
-                        pnet::packet::icmpv6::Icmpv6Types::TimeExceeded => {
-                            let reply = TimeExceededPacket::new(packet.packet()).unwrap();
-                            println!(
-                                "ICMPv6 TimeExceeded received from {:?}: {:?} , Time:{:?}",
-                                addr,
-                                packet.get_icmpv6_type(),
-                                rtt,
-                            );
-                        }
-                        pnet::packet::icmpv6::Icmpv6Types::DestinationUnreachable => {
-                            println!(
-                                "ICMPv6 DestinationUnreachable received from {:?}, Time:{:?}",
-                                addr, rtt
-                            );
-                        }
-                        pnet::packet::icmpv6::Icmpv6Types::NeighborSolicit=> {
-                            println!(
-                                "ICMPv6 NeighborSolicit received from {:?}, Time:{:?}",
-                                addr, rtt
-                            );
-                        }
-                        pnet::packet::icmpv6::Icmpv6Types::RouterAdvert=> {
-                            println!(
-                                "ICMPv6 RouterAdvert received from {:?}, Time:{:?}",
-                                addr, rtt
-                            );
-                        }
-                        pnet::packet::icmpv6::Icmpv6Types::NeighborAdvert=> {
-                            println!(
-                                "ICMPv6 NeighborAdvert received from {:?}, Time:{:?}",
-                                addr, rtt
-                            );
-                        }
-                        _ => {
-                            println!("get package {:?}, {:?}", packet.get_icmpv6_type(), addr);
-                            // println!("get icmp reply: {:?}", t)
+        if is_ipv4 {
+            let mut iter = icmp_packet_iter(&mut rx);
+            loop {
+                let timer = Arc::new(RwLock::new(Instant::now()));
+                match iter.next() {
+                    std::result::Result::Ok((packet, addr)) => {
+                        let start_time = timer.read().unwrap();
+                        let rtt = Instant::now().duration_since(*start_time);
+                        match packet.get_icmp_type() {
+                            IcmpTypes::EchoReply => {
+                                let reply = EchoReplyPacket::new(packet.packet()).unwrap();
+                                let identifier = reply.get_identifier();
+                                let sequence_number = reply.get_sequence_number();
+                                println!(
+                                    "ICMP EchoReply received from {:?}: {:?} , Time:{:?}; identify: {}, seq: {}",
+                                    addr,
+                                    packet.get_icmp_type(),
+                                    rtt,
+                                    identifier,
+                                    sequence_number
+                                );
+                                break;
+                            }
+                            IcmpTypes::TimeExceeded => {
+                                let reply = TimeExceededPacket::new(packet.packet()).unwrap();
+                                println!(
+                                    "ICMP TimeExceeded received from {:?}: {:?} , Time:{:?}",
+                                    addr,
+                                    packet.get_icmp_type(),
+                                    rtt,
+                                );
+                            }
+                            IcmpTypes::DestinationUnreachable => {
+                                println!(
+                                    "ICMP DestinationUnreachable received from {:?}, Time:{:?}",
+                                    addr, rtt
+                                );
+                            }
+                            IcmpTypes::Timestamp => {
+                                println!(
+                                    "ICMP Timestamp received from {:?}, Time:{:?}",
+                                    addr, rtt
+                                );
+                            }
+                            _ => {
+                                println!("get package {:?}, {:?}", packet.get_icmp_type(), addr);
+                                // println!("get icmp reply: {:?}", t)
+                            }
                         }
                     }
+                    Err(e) => {
+                        println!("An error occurred while reading: {}", e);
+                        break;
+                    }
                 }
-                Err(e) => {
-                    println!("An error occurred while reading: {}", e);
-                    break;
-                }
+
+                std::thread::sleep(std::time::Duration::from_millis(500));
             }
+        } else {
+            let mut iter = pnet_transport::icmpv6_packet_iter(&mut rx);
+            loop {
+                let timer = Arc::new(RwLock::new(Instant::now()));
+                match iter.next() {
+                    std::result::Result::Ok((packet, addr)) => {
+                        let start_time = timer.read().unwrap();
+                        let rtt = Instant::now().duration_since(*start_time);
+                        match packet.get_icmpv6_type() {
+                            pnet::packet::icmpv6::Icmpv6Types::EchoReply => {
+                                let reply = pnet::packet::icmpv6::echo_reply::EchoReplyPacket::new(packet.packet()).unwrap();
+                                let identifier = reply.get_identifier();
+                                let sequence_number = reply.get_sequence_number();
+                                println!(
+                                    "ICMPv6 EchoReply received from {:?}: {:?} , Time:{:?}; identify: {}, seq: {}",
+                                    addr,
+                                    packet.get_icmpv6_type(),
+                                    rtt,
+                                    identifier,
+                                    sequence_number
+                                );
+                                break;
+                            }
+                            pnet::packet::icmpv6::Icmpv6Types::TimeExceeded => {
+                                let reply = TimeExceededPacket::new(packet.packet()).unwrap();
+                                println!(
+                                    "ICMPv6 TimeExceeded received from {:?}: {:?} , Time:{:?}",
+                                    addr,
+                                    packet.get_icmpv6_type(),
+                                    rtt,
+                                );
+                            }
+                            pnet::packet::icmpv6::Icmpv6Types::DestinationUnreachable => {
+                                println!(
+                                    "ICMPv6 DestinationUnreachable received from {:?}, Time:{:?}",
+                                    addr, rtt
+                                );
+                            }
+                            pnet::packet::icmpv6::Icmpv6Types::NeighborSolicit => {
+                                println!(
+                                    "ICMPv6 NeighborSolicit received from {:?}, Time:{:?}",
+                                    addr, rtt
+                                );
+                            }
+                            pnet::packet::icmpv6::Icmpv6Types::RouterAdvert => {
+                                println!(
+                                    "ICMPv6 RouterAdvert received from {:?}, Time:{:?}",
+                                    addr, rtt
+                                );
+                            }
+                            pnet::packet::icmpv6::Icmpv6Types::NeighborAdvert => {
+                                println!(
+                                    "ICMPv6 NeighborAdvert received from {:?}, Time:{:?}",
+                                    addr, rtt
+                                );
+                            }
+                            _ => {
+                                println!("get package {:?}, {:?}", packet.get_icmpv6_type(), addr);
+                                // println!("get icmp reply: {:?}", t)
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("An error occurred while reading: {}", e);
+                        break;
+                    }
+                }
 
-            std::thread::sleep(std::time::Duration::from_millis(500));
+                std::thread::sleep(std::time::Duration::from_millis(500));
+            }
         }
-
-    }
     }).join().unwrap();
     Ok(())
 }
