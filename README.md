@@ -1,7 +1,8 @@
-# vtraceroute
+# traceroute
+[![Rust Report Card](https://rust-reportcard.xuri.me/badge/github.com/eval-exec/traceroute)](https://rust-reportcard.xuri.me/report/github.com/eval-exec/traceroute)
 
 ```bash
-$ cargo build -r && sudo ~/.cache/rust-build-target/release/vtraceroute 204.79.197.200
+$ cargo build -r && sudo ~/.cache/rust-build-target/release/traceroute 204.79.197.200
 
 icmp echo request to target ip:204.79.197.200
 ICMP TimeExceeded received from 192.168.1.1: IcmpType(11) , Time:3.806229ms

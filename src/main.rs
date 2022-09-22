@@ -10,12 +10,12 @@ use std::{
 use anyhow::{Ok, Result};
 use pnet::packet::icmpv6::Icmpv6Types;
 use pnet::packet::{
+    icmp,
     icmp::{
-        echo_reply::EchoReplyPacket,
-        echo_request::{IcmpCodes, MutableEchoRequestPacket},
-        time_exceeded::TimeExceededPacket,
+        echo_reply::EchoReplyPacket, echo_request::IcmpCodes, time_exceeded::TimeExceededPacket,
         IcmpTypes,
     },
+    icmpv6,
     icmpv6::{echo_request::Icmpv6Codes::NoCode, Icmpv6Types::EchoRequest},
     ip::IpNextHeaderProtocols,
     util, Packet,
@@ -211,8 +211,11 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn create_icmpv4_packet(icmp_header: &mut [u8], seq: u8) -> MutableEchoRequestPacket {
-    let mut icmp_packet = MutableEchoRequestPacket::new(icmp_header).unwrap();
+fn create_icmpv4_packet(
+    icmp_header: &mut [u8],
+    seq: u8,
+) -> icmp::echo_request::MutableEchoRequestPacket {
+    let mut icmp_packet = icmp::echo_request::MutableEchoRequestPacket::new(icmp_header).unwrap();
     icmp_packet.set_icmp_type(IcmpTypes::EchoRequest);
     icmp_packet.set_icmp_code(IcmpCodes::NoCode);
     icmp_packet.set_identifier(random::<u16>());
@@ -226,9 +229,8 @@ fn create_icmpv4_packet(icmp_header: &mut [u8], seq: u8) -> MutableEchoRequestPa
 fn create_icmpv6_packet(
     icmp_header: &mut [u8],
     seq: u8,
-) -> pnet::packet::icmpv6::echo_request::MutableEchoRequestPacket {
-    let mut icmp_packet =
-        pnet::packet::icmpv6::echo_request::MutableEchoRequestPacket::new(icmp_header).unwrap();
+) -> icmpv6::echo_request::MutableEchoRequestPacket {
+    let mut icmp_packet = icmpv6::echo_request::MutableEchoRequestPacket::new(icmp_header).unwrap();
     icmp_packet.set_icmpv6_type(EchoRequest);
     icmp_packet.set_icmpv6_code(NoCode);
     icmp_packet.set_identifier(random::<u16>());
